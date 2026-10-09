@@ -1,3 +1,4 @@
+```ts
 import {
   getSitemapBase,
   getSitemapCounts,
@@ -16,7 +17,10 @@ export async function GET() {
   try {
     const base = await getSitemapBase();
     const counts = await getSitemapCounts(base);
-    const total = Object.values(counts).reduce((sum, value) => sum + value, 0) + await getStaticSitemapUrlCount(base);
+
+    const total =
+      Object.values(counts).reduce((sum, value) => sum + value, 0) +
+      (await getStaticSitemapUrlCount(base));
 
     if (total <= SITEMAP_URL_LIMIT) {
       return new Response(await renderAllSitemap(base), {
@@ -29,8 +33,10 @@ export async function GET() {
 
     const sitemapUrls = SITEMAP_TYPES.flatMap((type) => {
       const count = counts[type];
-      return Array.from({ length: sitemapChunkCount(count) }, (_, i) =>
-        `${base}/sitemap-${type}-${i + 1}.xml`
+
+      return Array.from(
+        { length: sitemapChunkCount(count) },
+        (_, i) => `${base}/sitemap-${type}-${i + 1}.xml`
       );
     });
 
@@ -41,21 +47,24 @@ export async function GET() {
       },
     });
   } catch (error) {
-    // Keep the entry point valid during a transient database/settings outage.
-    // Dynamic content will appear again on the next successful request.
+    // Keep the sitemap endpoint available during temporary errors.
     console.error("[sitemap] failed to generate sitemap:", error);
 
     try {
       const base = await getSitemapBase();
-      return new Response(renderAllSitemap(base), {
+
+      return new Response(await renderAllSitemap(base), {
         headers: {
           "content-type": "application/xml; charset=utf-8",
           "cache-control": "no-store",
         },
       });
-    } catch {
+    } catch (fallbackError) {
+      console.error("[sitemap] fallback generation failed:", fallbackError);
+
       return new Response(
-        `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"></urlset>`,
+        `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"></urlset>`,
         {
           status: 503,
           headers: {
@@ -67,3 +76,4 @@ export async function GET() {
     }
   }
 }
+```
